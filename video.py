@@ -56,8 +56,7 @@ class VideoPipeline:
         image_paths = [os.path.join(root_dir, file) for file in image_filenames]
         return image_paths
 
-    @staticmethod
-    def _extract_file_counter(filename: str) -> int:
+    def _extract_file_counter(self, filename: str) -> int:
         pattern = r'^.*?_(\d+)$'
         err = ValueError(f'Couldn\'t extract file counter. Filename "{filename}" has a wrong format.')
         filename = splitext(filename)[0]
