@@ -20,7 +20,7 @@ class VideoPipeline:
         6: 'surprise',
     }
 
-    def predict_on_frames_with_optimization(self, ordered_image_paths: list[str], model: torch.nn.Module) -> None:
+    def batch_predict_on_frames(self, ordered_image_paths: list[str], model: torch.nn.Module) -> None:
         """The function assumes that image paths in the list are in correct order.
         """
         images = [Image.open(path) for path in ordered_image_paths]
