@@ -4,7 +4,7 @@ from torch import nn
 
 from model import DummyModel
 from preprocessing import PreprocessedImageFolder, augmentations, make_dls
-from trainer import ActivationStatsCB, AugmentCB, DeviceCB, ProgressCB, Trainer
+from trainer import ActivationStatsCB, AugmentCB, DeviceCB, ProgressCB, Trainer, WandBCB
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -31,6 +31,7 @@ model.apply(init_weights)
 # lr_find = LRFinderCB(min_lr=1e-4, max_lr=0.1, max_mult=3)
 act_stats = ActivationStatsCB(lambda x: isinstance(x, nn.Linear))
 progress = ProgressCB(in_notebook=False)
+wandb_cb = WandBCB(proj_name="test", model_path="./model.pth")
 augment = AugmentCB(device=device, transform=augmentations)
 
 trainer = Trainer(
@@ -39,15 +40,17 @@ trainer = Trainer(
     F.nll_loss,
     torch.optim.SGD,
     lr=5e-3,
-    cbs=[DeviceCB(device), augment, progress, act_stats],
+    cbs=[DeviceCB(device), augment, progress, act_stats, wandb_cb],
 )  # lr_find
 trainer.fit(2, True, True)
 
+# TODO: saving plots to wandb
 progress.plot_losses(save=True)
 act_stats.plot_stats(save=True)
 act_stats.color_dim(save=True)
 act_stats.dead_chart(save=True)
 
+# TODO: Metrics
 acc = []
 with torch.inference_mode():
     for images, labels in dls.valid:
@@ -60,4 +63,4 @@ with torch.inference_mode():
 
     print(f"Accuracy: {torch.hstack(acc).mean().item():.4f}")
 
-torch.save(trainer.model.state_dict(), "./model.pth")
+# torch.save(trainer.model.state_dict(), "./model.pth") # done by WandBCB

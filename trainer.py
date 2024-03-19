@@ -8,6 +8,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+import wandb
+
 
 class CancelFitException(Exception):
     pass
@@ -155,11 +157,11 @@ class ProgressCB(Callback):
     def after_loss(self, trainer):
         if trainer.training:
             self.train_loss.append(trainer.loss.item())
-            tmp_train_loss = np.mean(
-                self.train_loss[-10:] if len(self.train_loss) > 10 else 0
+            tmp_train_loss = (
+                np.mean(self.train_loss[-10:]) if len(self.train_loss) > 10 else 0
             )
-            tmp_valid_loss = np.mean(
-                self.valid_loss[-len(trainer.dls.valid) :]
+            tmp_valid_loss = (
+                np.mean(self.valid_loss[-len(trainer.dls.valid) :])
                 if len(self.valid_loss) > 0
                 else 0
             )
@@ -199,8 +201,8 @@ class DeviceCB(Callback):
 
 
 class Hook:
-    def __init__(self, mod, f):
-        self.hook = mod.register_forward_hook(partial(f, self))
+    def __init__(self, name, mod, f):
+        self.hook = mod.register_forward_hook(partial(f, self, name))
 
     def remove(self):
         self.hook.remove()
@@ -211,7 +213,7 @@ class Hook:
 
 class Hooks(list):
     def __init__(self, mods, f):
-        super().__init__([Hook(m, f) for m in mods])
+        super().__init__([Hook(n, m, f) for n, m in mods])
 
     def __enter__(self, *args):
         return self
@@ -238,11 +240,11 @@ class HooksCB(Callback):
         self.mod_filter = mod_filter
 
     def before_fit(self, trainer):
-        mods = list(
-            filter(
-                self.mod_filter, [mod for name, mod in trainer.model.named_modules()]
-            )
-        )
+        mods = [
+            (name, mod)
+            for name, mod in trainer.model.named_modules()
+            if self.mod_filter(mod)
+        ]
         self.hooks = Hooks(mods, partial(self._hookfunc, trainer.training))
 
     def _hookfunc(self, training, *args, **kwargs):
@@ -259,17 +261,52 @@ class HooksCB(Callback):
         return len(self.hooks)
 
 
-def append_stats(hook, mod, inp, outp):
+def append_stats(hook, name, mod, inp, outp):
     if not hasattr(hook, "stats"):
-        hook.stats = ([], [], [])
+        hook.stats = {"mean": [], "std": [], "abs": []}
     acts = outp.detach().cpu()
-    hook.stats[0].append(acts.mean())
-    hook.stats[1].append(acts.std())
-    hook.stats[2].append(acts.abs().histc(40, 0, 10))
+    hook.stats["mean"].append(acts.mean().item())
+    hook.stats["std"].append(acts.std().item())
+    hook.stats["abs"].append(acts.abs().histc(40, 0, 10).tolist())
+    wandb.log(
+        {
+            f"{name}/mean": acts.mean().item(),
+            f"{name}/std": acts.std().item(),
+            f"{name}/abs": wandb.Histogram(acts.abs().histc(40, 0, 10).tolist()),
+        },
+        commit=False,
+    )
 
 
 def get_grid(n, figsize):
     return plt.subplots(round(n / 2), 2, figsize=figsize)
+
+
+class WandBCB(Callback):
+    def __init__(self, proj_name, model_path):
+        self.proj_name = proj_name
+        self.model_path = model_path
+
+    def before_fit(self, trainer):
+        wandb.init(
+            project=self.proj_name,
+            config={"lr": trainer.lr, "n_epochs": trainer.n_epochs},
+        )
+        wandb.watch(trainer.model, log="all")
+
+    def after_loss(self, trainer):
+        if trainer.training:
+            wandb.log({"loss/train": trainer.loss.item()}, commit=False)
+        else:
+            wandb.log({"loss/valid": trainer.loss.item()}, commit=False)
+
+    def after_batch(self, trainer):
+        wandb.log({}, commit=True)
+
+    def after_fit(self, trainer):
+        torch.save(trainer.model.state_dict(), self.model_path)
+        wandb.save(self.model_path)
+        wandb.finish()
 
 
 class ActivationStatsCB(HooksCB):
