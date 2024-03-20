@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
-
 import wandb
 
 
@@ -28,6 +27,8 @@ class Callback:
 
 
 class with_cbs:
+    """Decorator that wraps function and calls certain callbacks before/after that function."""
+
     def __init__(self, nm):
         self.nm = nm
 
@@ -49,12 +50,14 @@ def run_cbs(cbs, method_nm, trainer=None):
     for cb in sorted(cbs, key=attrgetter("order")):  # sort callbacks by 'order'
         method = getattr(
             cb, method_nm, None
-        )  # get method from callback e.g. 'before_batch'
+        )  # get method from callback e.g. `before_batch`
         if method is not None:
             method(trainer)  # if callback has such method then call it
 
 
 class Trainer:
+    """Trainer with callbacks"""
+
     def __init__(
         self,
         model,
@@ -137,6 +140,8 @@ class Trainer:
 
 
 class ProgressCB(Callback):
+    """Adds progress bar to Trainer"""
+
     def __init__(self, in_notebook=False):
         super().__init__()
         self.train_loss = []
@@ -189,6 +194,8 @@ class ProgressCB(Callback):
 
 
 class DeviceCB(Callback):
+    """Moves model and batches to device"""
+
     def __init__(self, device="cpu"):
         self.device = device
 
@@ -201,6 +208,8 @@ class DeviceCB(Callback):
 
 
 class Hook:
+    """Registers PyTorch forward hook with provided function"""
+
     def __init__(self, name, mod, f):
         self.hook = mod.register_forward_hook(partial(f, self, name))
 
@@ -212,6 +221,8 @@ class Hook:
 
 
 class Hooks(list):
+    """List of hooks"""
+
     def __init__(self, mods, f):
         super().__init__([Hook(n, m, f) for n, m in mods])
 
@@ -234,6 +245,8 @@ class Hooks(list):
 
 
 class HooksCB(Callback):
+    """Appends hooks with some `hookfunc` to selected layers filtered by `mod_filter`."""
+
     def __init__(self, hookfunc, mod_filter=lambda x: True):
         super().__init__()
         self.hookfunc = hookfunc
@@ -283,6 +296,8 @@ def get_grid(n, figsize):
 
 
 class WandBCB(Callback):
+    """Inits and logs to W&B."""
+
     def __init__(self, proj_name, model_path):
         self.proj_name = proj_name
         self.model_path = model_path
@@ -362,7 +377,7 @@ class ActivationStatsCB(HooksCB):
 
 
 class LRFinderCB(Callback):
-    """Proposes approx. good LR for a model. Usually you should choose value where loss is still decreasing, not the lowest value."""
+    """Suggests an approx. good LR for a model. Usually you should choose value where loss is still decreasing (steepest slope), not the lowest value."""
 
     def __init__(self, min_lr=1e-6, max_lr=1, max_mult=3, num_iter=100):
         self.min_lr = min_lr
@@ -402,10 +417,14 @@ class LRFinderCB(Callback):
         if log:
             plt.xscale("log")
         self.best_lr = self.lrs[self.losses.index(self.min)]
-        plt.plot(self.best_lr, self.min, "ro")
+        plt.plot(
+            self.best_lr, self.min, "ro"
+        )  # TODO: find not lowest but steepest slope value
 
 
 class AugmentCB(Callback):
+    """Computes augmentation transformations on device (e.g. GPU) for faster training."""
+
     def __init__(self, device="cpu", transform=None):
         super().__init__()
         self.device = device
