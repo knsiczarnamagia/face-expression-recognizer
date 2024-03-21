@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
+
 import wandb
 
 
@@ -296,7 +297,9 @@ def get_grid(n, figsize):
 
 
 class WandBCB(Callback):
-    """Inits and logs to W&B."""
+    """Inits and logs to W&B. Every `wandb.log()` outside this callback should have property `commit=False` because this callback gathers all logs in given batch."""
+
+    order = math.inf  # make sure that this callback will be called last
 
     def __init__(self, proj_name, model_path):
         self.proj_name = proj_name
@@ -437,3 +440,38 @@ class AugmentCB(Callback):
                 *trainer.batch[trainer.n_inp :],
             ]
         )
+
+
+class MultiClassAccuracyCB(Callback):
+    def __init__(self):
+        self.all_acc = {"train": [], "valid": []}
+
+    def before_epoch(self, trainer):
+        self.acc = []
+
+    def after_predict(self, trainer):
+        self.acc = []
+        with torch.inference_mode():
+            self.acc.append(
+                (
+                    F.softmax(trainer.preds, dim=1).argmax(1)
+                    == trainer.batch[trainer.n_inp :][0]
+                ).float()
+            )
+
+    def after_epoch(self, trainer):
+        final_acc = torch.hstack(self.acc).mean().item()
+        if trainer.training:
+            wandb.log({"accuracy/train": final_acc}, commit=False)
+            self.all_acc["train"].append(final_acc)
+        else:
+            wandb.log({"accuracy/valid": final_acc}, commit=False)
+            self.all_acc["valid"].append(final_acc)
+        self.acc = []
+
+    def plot_acc(self):
+        fig, axes = get_grid(2, (20, 10))
+        axes[0].plot(self.all_acc["train"])
+        axes[0].set_title("train acc")
+        axes[1].plot(self.all_acc["valid"])
+        axes[1].set_title("valid acc")
