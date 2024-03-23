@@ -129,7 +129,7 @@ def _detect_outliers_with_pca(orig_data: np.ndarray,
 
 
 if __name__ == '__main__':
-    extract_outliers_stat('../dataset', _DATASET_AVG_MEAN, _DATASET_AVG_STD, mean_thresh=_OPTIM_MEAN_THRESH)
-    extract_outliers_stat('../dataset', _DATASET_AVG_MEAN, _DATASET_AVG_STD, std_thresh=_OPTIM_STD_THRESH)
-    extract_outliers_pca('../dataset/train')
-    extract_outliers_pca('../dataset/test')
+    extract_outliers_stat('./dataset', _DATASET_AVG_MEAN, _DATASET_AVG_STD, mean_thresh=_OPTIM_MEAN_THRESH)
+    extract_outliers_stat('./dataset', _DATASET_AVG_MEAN, _DATASET_AVG_STD, std_thresh=_OPTIM_STD_THRESH)
+    extract_outliers_pca('./dataset/train')
+    extract_outliers_pca('./dataset/test')
