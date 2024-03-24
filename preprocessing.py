@@ -5,6 +5,9 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 from torchvision.transforms import v2
 
+DATASET_MEAN = 0.5077385902404785
+DATASET_STD = 0.255077600479126
+
 
 class PreprocessedImageFolder(ImageFolder):
     def __init__(self, root, transform=None):
@@ -14,6 +17,7 @@ class PreprocessedImageFolder(ImageFolder):
                 v2.Grayscale(),
                 v2.PILToTensor(),
                 v2.ToDtype(torch.float32, scale=True),
+                v2.Normalize(mean=(DATASET_MEAN,), std=(DATASET_STD,)),
             ]
         )
 
@@ -39,7 +43,6 @@ augmentations = v2.Compose(
         v2.RandomResizedCrop(size=48, scale=(0.9, 1.1), antialias=True),
         v2.RandomAffine(degrees=(-10, 10), translate=(0.1, 0.1), scale=(0.9, 1.1)),
         v2.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0)),
-        v2.Normalize(mean=(0.5,), std=(0.5,)),
     ]
 )
 
@@ -52,7 +55,7 @@ def make_dls(train_ds, valid_ds, batch_size=64, num_workers=2):
         num_workers=num_workers,
         pin_memory=True,
         persistent_workers=True,
-    )  # prefetch_factor=8?
+    )
     valid_dl = DataLoader(
         valid_ds,
         batch_size=batch_size,
