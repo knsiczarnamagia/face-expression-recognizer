@@ -301,15 +301,22 @@ class WandBCB(Callback):
 
     order = math.inf  # make sure that this callback will be called last
 
-    def __init__(self, proj_name, model_path):
+    def __init__(self, proj_name, model_path, run_name=None, notes=None):
         self.proj_name = proj_name
+        self.run_name = run_name
         self.model_path = model_path
+        self.notes = notes
 
     def before_fit(self, trainer):
-        wandb.init(
+        config = dict(
             project=self.proj_name,
             config={"lr": trainer.lr, "n_epochs": trainer.n_epochs},
         )
+        if self.run_name is not None:
+            config["name"] = self.run_name
+        if self.notes is not None:
+            config["notes"] = self.notes
+        wandb.init(**config)
         wandb.watch(trainer.model, log="all")
 
     def after_loss(self, trainer):
