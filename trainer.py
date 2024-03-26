@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
-
 import wandb
 
 
@@ -275,21 +274,22 @@ class HooksCB(Callback):
         return len(self.hooks)
 
 
-def append_stats(hook, name, mod, inp, outp):
+def append_stats(with_wandb, hook, name, mod, inp, outp):
     if not hasattr(hook, "stats"):
         hook.stats = {"mean": [], "std": [], "abs": []}
     acts = outp.detach().cpu()
     hook.stats["mean"].append(acts.mean().item())
     hook.stats["std"].append(acts.std().item())
     hook.stats["abs"].append(acts.abs().histc(40, 0, 10).tolist())
-    wandb.log(
-        {
-            f"{name}/mean": acts.mean().item(),
-            f"{name}/std": acts.std().item(),
-            f"{name}/abs": wandb.Histogram(acts.abs().histc(40, 0, 10).tolist()),
-        },
-        commit=False,
-    )
+    if with_wandb:
+        wandb.log(
+            {
+                f"{name}/mean": acts.mean().item(),
+                f"{name}/std": acts.std().item(),
+                f"{name}/abs": wandb.Histogram(acts.abs().histc(40, 0, 10).tolist()),
+            },
+            commit=False,
+        )
 
 
 def get_grid(n, figsize):
@@ -335,8 +335,8 @@ class WandBCB(Callback):
 
 
 class ActivationStatsCB(HooksCB):
-    def __init__(self, mod_filter=lambda x: x):
-        super().__init__(append_stats, mod_filter)
+    def __init__(self, mod_filter=lambda x: x, with_wandb=False):
+        super().__init__(partial(append_stats, with_wandb), mod_filter)
 
     def plot_stats(self, save=True):  # plot output means & std devs of each module
         fig, axes = get_grid(2, figsize=(20, 10))
@@ -450,8 +450,9 @@ class AugmentCB(Callback):
 
 
 class MultiClassAccuracyCB(Callback):
-    def __init__(self):
+    def __init__(self, with_wandb=False):
         self.all_acc = {"train": [], "valid": []}
+        self.with_wandb = with_wandb
 
     def before_epoch(self, trainer):
         self.acc = []
@@ -469,10 +470,12 @@ class MultiClassAccuracyCB(Callback):
     def after_epoch(self, trainer):
         final_acc = torch.hstack(self.acc).mean().item()
         if trainer.training:
-            wandb.log({"accuracy/train": final_acc}, commit=False)
+            if self.with_wandb:
+                wandb.log({"accuracy/train": final_acc}, commit=False)
             self.all_acc["train"].append(final_acc)
         else:
-            wandb.log({"accuracy/valid": final_acc}, commit=False)
+            if self.with_wandb:
+                wandb.log({"accuracy/valid": final_acc}, commit=False)
             self.all_acc["valid"].append(final_acc)
         self.acc = []
 

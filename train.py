@@ -37,11 +37,11 @@ model.apply(init_weights)
 
 
 # lr_find = LRFinderCB(min_lr=1e-4, max_lr=0.1, max_mult=3)
-act_stats = ActivationStatsCB(lambda x: isinstance(x, nn.Linear))
+act_stats = ActivationStatsCB(lambda x: isinstance(x, nn.Linear), with_wandb=True)
 progress = ProgressCB(in_notebook=False)
 wandb_cb = WandBCB(proj_name="test", model_path="./model.pth")
 augment = AugmentCB(device=device, transform=augmentations)
-acc_cb = MultiClassAccuracyCB()
+acc_cb = MultiClassAccuracyCB(with_wandb=True)
 
 trainer = Trainer(
     model,
