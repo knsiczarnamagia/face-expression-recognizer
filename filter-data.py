@@ -8,16 +8,11 @@ from sklearn.decomposition import PCA
 import imagehash
 from typing import Callable
 from datetime import datetime as dt
+from abc import ABC, abstractmethod
 
 _DATASET_AVG_MEAN = 129.38489987766278
 _DATASET_AVG_STD = 54.084109207654805
-_OPTIM_MEAN_THRESH = 107
-_OPTIM_STD_THRESH = 51
-_OPTIM_NUM_COMPONENTS = 4
-_OPTIM_ERROR_THRESH = 87
 
-
-# Mean pixel intensity and mean standard deviation threshold strategy
 
 def save_to_file(location: str = './outliers.txt') -> Callable:
     def decorator(fn: Callable) -> Callable:
@@ -32,17 +27,6 @@ def save_to_file(location: str = './outliers.txt') -> Callable:
         return wrapper
 
     return decorator
-
-
-def remove(fn: Callable) -> Callable:
-    def wrapper(*args, **kwargs):
-        paths: list[str] = fn(*args, **kwargs)
-        for path in paths:
-            print(f'Removing {path}')
-            os.remove(path)
-        return paths
-
-    return wrapper
 
 
 def visualize(show_limit: int = -1) -> Callable:
@@ -72,120 +56,274 @@ def visualize(show_limit: int = -1) -> Callable:
     return decorator
 
 
-def compute_dataset_stats(data_root: str) -> dict[str, float]:
-    img_paths = list(Path(data_root).glob('**/*.jpg'))
-    num_images = len(img_paths)
-    mean_sum = 0
-    std_sum = 0
+class DataFilter(ABC):
+    def __init__(self):
+        self.paths = []
 
-    for img_path in img_paths:
-        img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
-        img_mean = np.mean(img)
-        img_std = np.std(img)
-        mean_sum += img_mean
-        std_sum += img_std
+    @abstractmethod
+    def extract(self, data_dir: str | Path) -> list[str]:
+        pass
 
-    avg_mean = mean_sum / num_images
-    avg_std = std_sum / num_images
-    stats_dict = {
-        'avg_mean': avg_mean,
-        'avg_std': avg_std,
-    }
-    return stats_dict
+    @abstractmethod
+    def clear(self) -> None:
+        pass
 
+    @abstractmethod
+    def filter(self) -> bool:
+        pass
 
-# WARNING: uncommenting the line below will remove dataset files
-# @remove
-@visualize()
-@save_to_file()
-def extract_outliers_stat(data_root: str | Path,
-                          dataset_avg_mean: float,
-                          dataset_avg_std: float,
-                          mean_thresh: float,
-                          std_thresh: float,
-                          console_progress: bool = False) -> list[str]:
-    outlier_paths = []
-    count = 0
-    _, _, paths = _load_data(data_root)
-    total_len = len(paths)
-    for path in iter(paths):
-        img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-        if abs(dataset_avg_mean - np.mean(img)) > mean_thresh or abs(dataset_avg_std - np.std(img)) > std_thresh:
-            outlier_paths.append(path)
-        if console_progress:
-            count += 1
-            print(f'Computed {count}/{total_len} images ({count / total_len * 100:.2f}%)')
-    return outlier_paths
+    @staticmethod
+    def _load_data(dir_: str) -> tuple[list[np.ndarray], list[str], list[str]]:
+        images = []
+        class_names = []
+        paths = []
+
+        for path in Path(dir_).glob('**/*.jpg'):
+            label = path.parent.name
+            image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+            if image is not None and label is not None:
+                images.append(np.array(image))
+                class_names.append(label)
+                paths.append(str(path))
+
+        return images, class_names, paths
 
 
-# PCA strategy
+class DataFilterCompose(DataFilter):
+    def __init__(self, components: list[DataFilter]):
+        super().__init__()
+        self.components = components
 
-def _load_data(dir_: str) -> tuple[list[np.ndarray], list[str], list[str]]:
-    images = []
-    class_names = []
-    paths = []
+    @staticmethod
+    def build(components: list[DataFilter]) -> DataFilter:
+        return DataFilterCompose(components)
 
-    for path in Path(dir_).glob('**/*.jpg'):
-        label = path.parent.name
-        image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
-        if not (image is None or label is None):
-            images.append(np.array(image))
-            class_names.append(label)
-            paths.append(str(path))
+    def extract(self, data_dir: str | Path) -> list[str]:
+        extracted_paths = []
+        for component in self.components:
+            cur_extracted_paths = component.extract(data_dir)
+            extracted_paths += cur_extracted_paths
+        self.paths += extracted_paths
+        return extracted_paths
 
-    return images, class_names, paths
+    def clear(self) -> None:
+        for component in self.components:
+            component.clear()
 
+    def filter(self):
+        for component in self.components:
+            component.filter()
 
-# WARNING: uncommenting the line below will remove dataset files
-# @remove
-@visualize()
-@save_to_file()
-def extract_outliers_pca(dir_: str | Path) -> list[str]:
-    x, y_labels, img_paths = _load_data(dir_)
-    x, y_labels = np.array(x), np.array(y_labels)
-    num_samples, height, width = x.shape
-    X_flattened = x.reshape(num_samples, height * width)
+    def add_component(self, component: DataFilter, position: int) -> None:
+        self.components.insert(position, component)
 
-    outlier_indices = _detect_outliers_with_pca(X_flattened, _OPTIM_NUM_COMPONENTS, _OPTIM_ERROR_THRESH)
-    img_paths_to_remove = [img_paths[i] for i in outlier_indices.tolist()]
-    return img_paths_to_remove
-
-
-def _detect_outliers_with_pca(orig_data: np.ndarray,
-                              num_components: int,
-                              error_thresh: float) -> np.ndarray:
-    pca = PCA(n_components=num_components)
-    X_reduced = pca.fit_transform(orig_data)
-
-    X_reconstructed = pca.inverse_transform(X_reduced)
-    reconstruction_errors = np.sqrt(np.mean((orig_data - X_reconstructed) ** 2, axis=1))
-
-    outlier_indices = np.where(reconstruction_errors > error_thresh)[0]
-    return outlier_indices
+    def rm_component(self, position: int) -> None:
+        self.components.pop(position)
 
 
-# WARNING: uncommenting the line below will remove dataset files
-# @remove
-@visualize(60)
-@save_to_file()
-def extract_duplicates_hash(dir_: str | Path, hash_size: int = 8) -> list[str]:
-    _, _, paths = _load_data(dir_)
-    hashes = set()
-    duplicates = []
+class StatsDataFilter(DataFilter):
+    _OPTIM_MEAN_THRESH = 107
+    _OPTIM_STD_THRESH = 51
 
-    for path in paths:
-        hash_ = imagehash.dhash(Image.open(path), hash_size)
-        if hash_ in hashes:
-            duplicates.append(path)
-        else:
-            hashes.add(hash_)
-    return duplicates
+    def __init__(self, data_avg_mean: float = None, data_avg_std: float = None, console_output: bool = False):
+        super().__init__()
+        self.data_avg_mean = data_avg_mean
+        self.data_avg_std = data_avg_std
+        self.console_output = console_output
+
+    @visualize()
+    # @save_to_file()
+    def extract(self, data_dir) -> list[str]:
+        if self.data_avg_mean is None or self.data_avg_std is None:
+            stats = self._compute_dataset_stats(data_dir)
+            self.data_avg_mean = stats['avg_mean']
+            self.data_avg_std = stats['avg_std']
+
+        extracted_paths = self._extract_outliers_by_stats(
+            data_dir,
+            self.data_avg_mean,
+            self.data_avg_std,
+            StatsDataFilter._OPTIM_MEAN_THRESH,
+            StatsDataFilter._OPTIM_STD_THRESH,
+            self.console_output)
+
+        self.paths += extracted_paths
+        return extracted_paths
+
+    def clear(self) -> None:
+        self.paths.clear()
+        if self.console_output:
+            print(f'[{self.__class__.__name__}]: Paths memory cleared.')
+
+    def filter(self) -> bool:
+        has_error = False
+        for path in self.paths:
+            if not Path(path).exists():
+                has_error = True
+                continue
+            os.remove(path)
+            if self.console_output:
+                print(f'[{self.__class__.__name__}]: Removed {path}')
+        return has_error
+
+    @classmethod
+    def _extract_outliers_by_stats(cls,
+                                   data_root: str | Path,
+                                   dataset_avg_mean: float,
+                                   dataset_avg_std: float,
+                                   mean_thresh: float,
+                                   std_thresh: float,
+                                   console_output: bool = False) -> list[str]:
+        outlier_paths = []
+        count = 0
+        _, _, paths = StatsDataFilter._load_data(data_root)
+        total_len = len(paths)
+        for path in iter(paths):
+            img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+            if abs(dataset_avg_mean - np.mean(img)) > mean_thresh or abs(
+                    dataset_avg_std - np.std(img)) > std_thresh:
+                outlier_paths.append(path)
+            if console_output:
+                count += 1
+                print(f'[{cls.__name__}]: Computed {count}/{total_len} images ({count / total_len * 100:.2f}%)')
+        return outlier_paths
+
+    @staticmethod
+    def _compute_dataset_stats(data_dir: str) -> dict[str, float]:
+        img_paths = list(Path(data_dir).glob('**/*.jpg'))
+        num_images = len(img_paths)
+        mean_sum = 0
+        std_sum = 0
+
+        for img_path in img_paths:
+            img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
+            img_mean = np.mean(img)
+            img_std = np.std(img)
+            mean_sum += img_mean
+            std_sum += img_std
+
+        avg_mean = mean_sum / num_images
+        avg_std = std_sum / num_images
+        stats_dict = {
+            'avg_mean': avg_mean,
+            'avg_std': avg_std,
+        }
+        return stats_dict
+
+
+class PcaDataFilter(DataFilter):
+    _OPTIM_NUM_COMPONENTS = 4
+    _OPTIM_ERROR_THRESH = 87
+
+    def __init__(self, console_output: bool = False):
+        super().__init__()
+        self.console_output = console_output
+
+    @visualize()
+    # @save_to_file()
+    def extract(self, data_dir: str | Path) -> list[str]:
+        extracted_paths = self._extract_outliers_with_pca(data_dir)
+        self.paths += extracted_paths
+        return extracted_paths
+
+    def clear(self) -> None:
+        self.paths.clear()
+        if self.console_output:
+            print(f'[{self.__class__.__name__}]: Paths memory cleared.')
+
+    def filter(self) -> bool:
+        has_error = False
+        for path in self.paths:
+            if not Path(path).exists():
+                has_error = True
+                continue
+            os.remove(path)
+            if self.console_output:
+                print(f'[{self.__class__.__name__}]: Removed {path}')
+        return has_error
+
+    @staticmethod
+    def _extract_outliers_with_pca(dir_: str | Path) -> list[str]:
+        x, _, img_paths = PcaDataFilter._load_data(dir_)
+        x = np.array(x)
+        num_samples, height, width = x.shape
+        X_flattened = x.reshape(num_samples, height * width)
+
+        outlier_indices = PcaDataFilter._detect_outliers_with_pca(X_flattened,
+                                                                  PcaDataFilter._OPTIM_NUM_COMPONENTS,
+                                                                  PcaDataFilter._OPTIM_ERROR_THRESH)
+        img_paths_to_remove = [img_paths[i] for i in outlier_indices.tolist()]
+        return img_paths_to_remove
+
+    @staticmethod
+    def _detect_outliers_with_pca(orig_data: np.ndarray,
+                                  num_components: int,
+                                  error_thresh: float) -> np.ndarray:
+        pca = PCA(n_components=num_components)
+        X_reduced = pca.fit_transform(orig_data)
+
+        X_reconstructed = pca.inverse_transform(X_reduced)
+        reconstruction_errors = np.sqrt(np.mean((orig_data - X_reconstructed) ** 2, axis=1))
+
+        outlier_indices = np.where(reconstruction_errors > error_thresh)[0]
+        return outlier_indices
+
+
+class DHashDuplicateFilter(DataFilter):
+    def __init__(self, hash_size: int = 8, console_output: bool = False):
+        super().__init__()
+        self.hash_size = hash_size
+        self.console_output = console_output
+
+    @visualize(60)
+    # @save_to_file()
+    def extract(self, data_dir: str | Path) -> list[str]:
+        _, _, paths = self._load_data(data_dir)
+        hashes = set()
+        duplicates = []
+
+        for path in paths:
+            hash_ = imagehash.dhash(Image.open(path), self.hash_size)
+            if hash_ in hashes:
+                duplicates.append(path)
+                if self.console_output:
+                    print(f'[{self.__class__.__name__}]: Duplicate found at {path}')
+            else:
+                hashes.add(hash_)
+
+        self.paths += duplicates
+        return duplicates
+
+    def clear(self) -> None:
+        self.paths.clear()
+        if self.console_output:
+            print(f'[{self.__class__.__name__}]: Paths memory cleared.')
+
+    def filter(self) -> bool:
+        has_error = False
+        for path in self.paths:
+            if not Path(path).exists():
+                has_error = True
+                continue
+            os.remove(path)
+            if self.console_output:
+                print(f'[{self.__class__.__name__}]: Removed {path}')
+        return has_error
 
 
 if __name__ == '__main__':
     dataset_dir = Path('./dataset')
-    extract_outliers_stat(dataset_dir, _DATASET_AVG_MEAN, _DATASET_AVG_STD,
-                          _OPTIM_MEAN_THRESH, _OPTIM_STD_THRESH, console_progress=True)
-    extract_outliers_pca(dataset_dir / 'train')
-    extract_outliers_pca(dataset_dir / 'test')
-    extract_duplicates_hash(dataset_dir)
+
+    stats_filter = StatsDataFilter(_DATASET_AVG_MEAN, _DATASET_AVG_STD, True)
+    pca_filter = PcaDataFilter(console_output=True)
+    duplicate_filter = DHashDuplicateFilter(console_output=True)
+
+    compose = DataFilterCompose.build([
+        stats_filter,
+        pca_filter,
+        duplicate_filter
+    ])
+    compose.extract(dataset_dir)
+
+    # WARNING: uncommenting the line below will irreversibly remove dataset files
+    # compose.filter()
