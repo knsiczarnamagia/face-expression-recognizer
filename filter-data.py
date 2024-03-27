@@ -23,9 +23,7 @@ def save_to_file(location: str = './outliers.txt') -> Callable:
                 for p in paths:
                     file.write(f'{p}\n')
             return paths
-
         return wrapper
-
     return decorator
 
 
@@ -50,9 +48,7 @@ def visualize(show_limit: int = -1) -> Callable:
             fig.subplots_adjust(hspace=0.6, top=0.97)
             plt.show()
             return paths
-
         return wrapper
-
     return decorator
 
 
@@ -122,6 +118,7 @@ class DataFilterCompose(DataFilter):
 
 
 class StatsDataFilter(DataFilter):
+
     _OPTIM_MEAN_THRESH = 107
     _OPTIM_STD_THRESH = 51
 
@@ -212,6 +209,7 @@ class StatsDataFilter(DataFilter):
 
 
 class PcaDataFilter(DataFilter):
+
     _OPTIM_NUM_COMPONENTS = 4
     _OPTIM_ERROR_THRESH = 87
 
