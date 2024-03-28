@@ -427,15 +427,25 @@ class LRFinderCB(Callback):
         ):
             raise CancelFitException()
 
-    def plot_lrs(self, log=True):
-        plt.plot(self.lrs, self.losses)
+    def plot_lrs(self, log=True, window=None):
+        plt.plot(self.lrs, self.losses) # original loss curve
         plt.title("LR finder")
         if log:
             plt.xscale("log")
-        self.best_lr = self.lrs[self.losses.index(self.min)]
-        plt.plot(
-            self.best_lr, self.min, "ro"
-        )  # TODO: find not lowest but steepest slope value
+
+        if window is None:
+            window = self.num_iter//4
+            
+        smoothed_losses = np.convolve(self.losses, np.ones(window) / window, mode='valid')
+        gradients = np.gradient(smoothed_losses)
+        min_gradient_idx = np.argmin(gradients)
+        self.best_lr = self.lrs[min_gradient_idx + window // 2]
+
+        plt.plot(self.best_lr, smoothed_losses[min_gradient_idx + window // 2], "ro") # recomended LR value point
+        plt.text(self.best_lr, smoothed_losses[min_gradient_idx + window // 2],
+            f"LR: {self.best_lr:.1e}", fontsize=12, ha="center", va="bottom", bbox=dict(facecolor="white"))
+
+        plt.plot(self.lrs[window//2:-window//2+1], smoothed_losses, alpha=0.5) # smoothed loss curve version
 
 
 class AugmentCB(Callback):
