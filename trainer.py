@@ -1,3 +1,4 @@
+# code inspired by Fastai "Practical Deep Learning Part 2" Learner
 import math
 import os
 from functools import partial
@@ -140,7 +141,7 @@ class Trainer:
 
 
 class ProgressCB(Callback):
-    """Adds progress bar to Trainer"""
+    """Adds progress bar to Trainer and plotting loss curves after training."""
 
     def __init__(self, in_notebook=False):
         super().__init__()
@@ -341,6 +342,8 @@ class WandBCB(Callback):
 
 
 class ActivationStatsCB(HooksCB):
+    """Stores activation statistics of selected modules. Recommended only for debugging or visualizations, not for actual training because it significantly slows down training."""
+
     def __init__(self, mod_filter=lambda x: x, with_wandb=False):
         super().__init__(partial(append_stats, with_wandb), mod_filter)
 
@@ -371,7 +374,8 @@ class ActivationStatsCB(HooksCB):
         else:
             plt.show()
 
-    def dead_chart(self, save=True):  # plot % of dead neurons
+    # plot % of dead neurons
+    def dead_chart(self, save=True):
         fig, axes = get_grid(len(self.hooks), figsize=(20, 10))
         for ax, h in zip(axes.flatten(), self.hooks):
             ax.plot(self.get_min(h))
@@ -428,24 +432,37 @@ class LRFinderCB(Callback):
             raise CancelFitException()
 
     def plot_lrs(self, log=True, window=None):
-        plt.plot(self.lrs, self.losses) # original loss curve
+        plt.plot(self.lrs, self.losses)  # original loss curve
         plt.title("LR finder")
         if log:
             plt.xscale("log")
 
         if window is None:
-            window = self.num_iter//4
-            
-        smoothed_losses = np.convolve(self.losses, np.ones(window) / window, mode='valid')
+            window = self.num_iter // 4
+
+        smoothed_losses = np.convolve(
+            self.losses, np.ones(window) / window, mode="valid"
+        )
         gradients = np.gradient(smoothed_losses)
         min_gradient_idx = np.argmin(gradients)
         self.best_lr = self.lrs[min_gradient_idx + window // 2]
 
-        plt.plot(self.best_lr, smoothed_losses[min_gradient_idx + window // 2], "ro") # recomended LR value point
-        plt.text(self.best_lr, smoothed_losses[min_gradient_idx + window // 2],
-            f"LR: {self.best_lr:.1e}", fontsize=12, ha="center", va="bottom", bbox=dict(facecolor="white"))
+        plt.plot(
+            self.best_lr, smoothed_losses[min_gradient_idx + window // 2], "ro"
+        )  # recomended LR value point
+        plt.text(
+            self.best_lr,
+            smoothed_losses[min_gradient_idx + window // 2],
+            f"LR: {self.best_lr:.1e}",
+            fontsize=12,
+            ha="center",
+            va="bottom",
+            bbox=dict(facecolor="white"),
+        )
 
-        plt.plot(self.lrs[window//2:-window//2+1], smoothed_losses, alpha=0.5) # smoothed loss curve version
+        plt.plot(
+            self.lrs[window // 2 : -window // 2 + 1], smoothed_losses, alpha=0.5
+        )  # smoothed loss curve
 
 
 class AugmentCB(Callback):
