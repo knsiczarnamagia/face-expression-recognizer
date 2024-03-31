@@ -5,6 +5,7 @@ from torch import nn
 from model import ResNet18
 from preprocessing import PreprocessedImageFolder, augmentations, make_dls
 from trainer import (
+    LRFinderCB,
     ActivationStatsCB,
     AugmentCB,
     DeviceCB,
@@ -24,7 +25,7 @@ model = ResNet18(in_channels=1, n_classes=len(train_ds.classes))
 
 
 # lr_find = LRFinderCB(min_lr=1e-4, max_lr=0.1, max_mult=3)
-# act_stats = ActivationStatsCB(mod_filter=lambda x: isinstance(x, nn.Conv2d) or isinstance(x, nn.Linear), with_wandb=True)
+# act_stats = ActivationStatsCB(mod_filter=lambda x: isinstance(x, nn.Conv2d) or isinstance(x, nn.Linear), with_wandb=True) # for debugging purposes
 progress = ProgressCB(in_notebook=False)
 wandb_cb = WandBCB(proj_name="test", model_path="./model.pth")
 augment = AugmentCB(device=device, transform=augmentations)
@@ -42,8 +43,8 @@ trainer.fit(5, True, True)
 
 # TODO: saving plots to wandb
 progress.plot_losses(save=True)
-act_stats.plot_stats(save=True)
-act_stats.color_dim(save=True)
-act_stats.dead_chart(save=True)
+# act_stats.plot_stats(save=True)
+# act_stats.color_dim(save=True)
+# act_stats.dead_chart(save=True)
 
 # torch.save(trainer.model.state_dict(), "./model.pth") # done by WandBCB
