@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 
-from model import DummyModel
+from model import ResNet18
 from preprocessing import PreprocessedImageFolder
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -21,7 +21,7 @@ test_ds = PreprocessedImageFolder("./dataset/test", transform)
 train_dl = DataLoader(train_ds, batch_size=256, shuffle=True)
 test_dl = DataLoader(test_ds, batch_size=256, shuffle=True)
 
-model = DummyModel(n_classes=len(train_ds.classes))
+model = ResNet18(in_channels=1, n_classes=len(train_ds.classes))
 model.to(device)
 
 optim = torch.optim.Adam(model.parameters(), lr=3e-3)
