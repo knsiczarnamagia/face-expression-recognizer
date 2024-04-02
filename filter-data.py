@@ -18,10 +18,11 @@ def save_to_file(location: str = './outliers.txt') -> Callable:
     def decorator(fn: Callable) -> Callable:
         def wrapper(*args, **kwargs):
             paths: list[str] = fn(*args, **kwargs)
-            with open(location, 'a') as file:
-                file.write('\nFiles to remove [TIMESTAMP {}]:\n'.format(dt.now().strftime('%Y%m%d%H%M%S')))
-                for p in paths:
-                    file.write(f'{p}\n')
+            if kwargs.get('to_file'):
+                with open(location, 'a') as file:
+                    file.write('\nFiles to remove [TIMESTAMP {}]:\n'.format(dt.now().strftime('%Y%m%d%H%M%S')))
+                    for p in paths:
+                        file.write(f'{p}\n')
             return paths
         return wrapper
     return decorator
@@ -31,22 +32,23 @@ def visualize(show_limit: int = -1) -> Callable:
     def decorator(fn: Callable) -> Callable:
         def wrapper(*args, **kwargs):
             paths: list[str] = fn(*args, **kwargs)
-            if show_limit != -1:
-                paths = paths[:show_limit]
+            if kwargs.get('visualize_'):
+                if show_limit != -1:
+                    paths = paths[:show_limit]
 
-            num_cols = 8
-            num_rows = len(paths) // num_cols + 1
+                num_cols = 8
+                num_rows = len(paths) // num_cols + 1
 
-            fig = plt.figure(figsize=(8, 8))
-            for i, path in enumerate(paths, start=1):
-                plt.subplot(num_rows, num_cols, i)
-                plt.imshow(Image.open(path), cmap='gray')
-                plt.title(f'{Path(path).parent.name}', fontsize=7)
-                plt.axis('off')
-            fig.tight_layout()
-            plt.tight_layout()
-            fig.subplots_adjust(hspace=0.6, top=0.97)
-            plt.show()
+                fig = plt.figure(figsize=(8, 8))
+                for i, path in enumerate(paths, start=1):
+                    plt.subplot(num_rows, num_cols, i)
+                    plt.imshow(Image.open(path), cmap='gray')
+                    plt.title(f'{Path(path).parent.name}', fontsize=7)
+                    plt.axis('off')
+                fig.tight_layout()
+                plt.tight_layout()
+                fig.subplots_adjust(hspace=0.6, top=0.97)
+                plt.show()
             return paths
         return wrapper
     return decorator
@@ -57,7 +59,7 @@ class DataFilter(ABC):
         self.paths = []
 
     @abstractmethod
-    def extract(self, data_dir: str | Path) -> list[str]:
+    def extract(self, data_dir: str | Path, visualize_: bool, to_file: bool) -> list[str]:
         pass
 
     @abstractmethod
@@ -94,10 +96,12 @@ class DataFilterCompose(DataFilter):
     def build(components: list[DataFilter]) -> DataFilter:
         return DataFilterCompose(components)
 
-    def extract(self, data_dir: str | Path) -> list[str]:
+    def extract(self, data_dir: str | Path, visualize_: bool, to_file: bool) -> list[str]:
         extracted_paths = []
         for component in self.components:
-            cur_extracted_paths = component.extract(data_dir)
+            cur_extracted_paths = component.extract(data_dir,
+                                                    visualize_=visualize_,
+                                                    to_file=to_file)
             extracted_paths += cur_extracted_paths
         self.paths += extracted_paths
         return extracted_paths
@@ -118,7 +122,6 @@ class DataFilterCompose(DataFilter):
 
 
 class StatsDataFilter(DataFilter):
-
     _OPTIM_MEAN_THRESH = 107
     _OPTIM_STD_THRESH = 51
 
@@ -129,8 +132,8 @@ class StatsDataFilter(DataFilter):
         self.console_output = console_output
 
     @visualize()
-    # @save_to_file()
-    def extract(self, data_dir) -> list[str]:
+    @save_to_file()
+    def extract(self, data_dir: str | Path, visualize_: bool, to_file: bool) -> list[str]:
         if self.data_avg_mean is None or self.data_avg_std is None:
             stats = self._compute_dataset_stats(data_dir)
             self.data_avg_mean = stats['avg_mean']
@@ -209,7 +212,6 @@ class StatsDataFilter(DataFilter):
 
 
 class PcaDataFilter(DataFilter):
-
     _OPTIM_NUM_COMPONENTS = 4
     _OPTIM_ERROR_THRESH = 87
 
@@ -218,8 +220,8 @@ class PcaDataFilter(DataFilter):
         self.console_output = console_output
 
     @visualize()
-    # @save_to_file()
-    def extract(self, data_dir: str | Path) -> list[str]:
+    @save_to_file()
+    def extract(self, data_dir: str | Path, visualize_: bool, to_file: bool) -> list[str]:
         extracted_paths = self._extract_outliers_with_pca(data_dir)
         self.paths += extracted_paths
         return extracted_paths
@@ -274,8 +276,8 @@ class DHashDuplicateFilter(DataFilter):
         self.console_output = console_output
 
     @visualize(60)
-    # @save_to_file()
-    def extract(self, data_dir: str | Path) -> list[str]:
+    @save_to_file()
+    def extract(self, data_dir: str | Path, visualize_: bool, to_file: bool) -> list[str]:
         _, _, paths = self._load_data(data_dir)
         hashes = set()
         duplicates = []
@@ -321,7 +323,10 @@ if __name__ == '__main__':
         pca_filter,
         duplicate_filter
     ])
-    compose.extract(dataset_dir)
+
+    # You may set the value of visualize_ or to_file parameters to True
+    # to plot extracted images or save paths to a file.
+    stats_filter.extract(dataset_dir, visualize_=False, to_file=False)
 
     # WARNING: uncommenting the line below will irreversibly remove dataset files
     # compose.filter()
