@@ -24,7 +24,7 @@ class FaceDetector:
         return face_images
 
 
-def draw_bboxes(self, img: Image.Image, boxes, color: tuple[int, int, int]) -> Image.Image:
+def draw_bboxes(img: Image.Image, boxes, color: tuple[int, int, int]) -> Image.Image:
     img_draw = ImageDraw.Draw(img.copy())
     for box in boxes:
         img_draw.rectangle(box.tolist(), outline=color, width=2)
