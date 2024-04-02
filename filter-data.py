@@ -14,9 +14,9 @@ _DATASET_AVG_MEAN = 129.38489987766278
 _DATASET_AVG_STD = 54.084109207654805
 
 
-def save_to_file(location: str = './outliers.txt') -> Callable:
-    def decorator(fn: Callable) -> Callable:
-        def wrapper(*args, **kwargs):
+def save_to_file(location: str = './extracted_paths.txt') -> Callable:
+    def outer_wrapper(fn: Callable) -> Callable:
+        def inner_wrapper(*args, **kwargs):
             paths: list[str] = fn(*args, **kwargs)
             if kwargs.get('to_file'):
                 with open(location, 'a') as file:
@@ -24,13 +24,13 @@ def save_to_file(location: str = './outliers.txt') -> Callable:
                     for p in paths:
                         file.write(f'{p}\n')
             return paths
-        return wrapper
-    return decorator
+        return inner_wrapper
+    return outer_wrapper
 
 
 def visualize(show_limit: int = -1) -> Callable:
-    def decorator(fn: Callable) -> Callable:
-        def wrapper(*args, **kwargs):
+    def outer_wrapper(fn: Callable) -> Callable:
+        def inner_wrapper(*args, **kwargs):
             paths: list[str] = fn(*args, **kwargs)
             if kwargs.get('visualize_'):
                 if show_limit != -1:
@@ -50,8 +50,8 @@ def visualize(show_limit: int = -1) -> Callable:
                 fig.subplots_adjust(hspace=0.6, top=0.97)
                 plt.show()
             return paths
-        return wrapper
-    return decorator
+        return inner_wrapper
+    return outer_wrapper
 
 
 class DataFilter(ABC):
