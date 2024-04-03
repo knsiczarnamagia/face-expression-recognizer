@@ -10,13 +10,12 @@ class FaceDetector:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = MTCNN(keep_all=True, device=device)
 
-    def detect_bboxes(self, img: Image) -> np.ndarray:
+    def detect_bboxes(self, img: Image.Image) -> np.ndarray:
         boxes, probs = self.model.detect(img)
         return boxes
     
-    def extract_faces(self, img: Image, bounding_boxes) -> list[Image]:
-        face_images_tensors = self.model.extract(img, bounding_boxes,
-                                                 save_path='dev/extracted/extracted.jpg')
+    def extract_faces(self, img: Image.Image, bounding_boxes) -> list[Image.Image]:
+        face_images_tensors = self.model.extract(img, bounding_boxes, save_path='extracted/extracted.jpg')
         face_images = []
         for image in face_images_tensors:
             print(image.shape)
