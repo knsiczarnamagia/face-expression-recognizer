@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision.datasets import ImageFolder
 from torchvision.transforms import v2
 
@@ -47,14 +47,25 @@ augmentations = v2.Compose(
 )
 
 
-def make_dls(train_ds, valid_ds, batch_size=64, num_workers=2):
+def weighted_sampler(train_ds):
+    class_counts = {}
+    for _, class_id in train_ds.imgs:
+        class_counts[class_id] = class_counts.get(class_id, 0) + 1
+
+    weights = [1.0 / class_counts[class_id] for _, class_id in train_ds.imgs]
+    train_sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
+    return train_sampler
+
+
+def make_dls(train_ds, valid_ds, batch_size=64, num_workers=2, train_sampler=None):
     train_dl = DataLoader(
         train_ds,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=True if train_sampler is None else False,
         num_workers=num_workers,
         pin_memory=True,
         persistent_workers=True,
+        sampler=train_sampler
     )
     valid_dl = DataLoader(
         valid_ds,

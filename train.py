@@ -1,12 +1,9 @@
 import torch
 import torch.nn.functional as F
-from torch import nn
 
 from model import ResNet18
-from preprocessing import PreprocessedImageFolder, augmentations, make_dls
+from preprocessing import PreprocessedImageFolder, augmentations, make_dls, weighted_sampler
 from trainer import (
-    LRFinderCB,
-    ActivationStatsCB,
     AugmentCB,
     DeviceCB,
     MultiClassAccuracyCB,
@@ -19,9 +16,11 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 train_ds = PreprocessedImageFolder("./dataset/train", None)
 valid_ds = PreprocessedImageFolder("./dataset/test", None)
-dls = make_dls(train_ds, valid_ds, batch_size=32, num_workers=2)
 
-model = ResNet18(in_channels=1, n_classes=len(train_ds.classes))
+sampler = weighted_sampler(train_ds)
+dls = make_dls(train_ds, valid_ds, batch_size=32, num_workers=2, train_sampler=sampler)
+
+model = ResNet18(in_channels=1, num_classes=len(train_ds.classes))
 
 
 # lr_find = LRFinderCB(min_lr=1e-4, max_lr=0.1, max_mult=3)
@@ -39,7 +38,7 @@ trainer = Trainer(
     lr=1e-4,
     cbs=[DeviceCB(device), augment, progress, wandb_cb, acc_cb],
 )  # act_stats, lr_find
-trainer.fit(5, True, True)
+trainer.fit(1, True, True)
 
 # TODO: saving plots to wandb
 progress.plot_losses(save=True)
