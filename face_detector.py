@@ -14,5 +14,5 @@ class FaceDetector:
         return boxes
     
     def extract_faces(self, img: Image.Image, bboxes) -> torch.Tensor:
-        face_images_tensors = self.model.extract(img, bboxes, save_path='extracted/extracted.jpg')
+        face_images_tensors = self.model.extract(img, bboxes, save_path='dev/extracted/extracted.jpg')
         return face_images_tensors
