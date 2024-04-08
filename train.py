@@ -21,7 +21,7 @@ train_ds = PreprocessedImageFolder("./dataset/train", None)
 valid_ds = PreprocessedImageFolder("./dataset/test", None)
 dls = make_dls(train_ds, valid_ds, batch_size=32, num_workers=2)
 
-model = ResNet18(in_channels=1, n_classes=len(train_ds.classes))
+model = ResNet18(in_channels=1, num_classes=len(train_ds.classes))
 
 
 # lr_find = LRFinderCB(min_lr=1e-4, max_lr=0.1, max_mult=3)
