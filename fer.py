@@ -1,5 +1,5 @@
 from face_detector import FaceDetector
-from model_old import ResNet18
+from model_small import ResNet18
 import numpy as np
 import torch
 from torch import nn
@@ -17,6 +17,7 @@ class FaceExpressionRecognizer:
         self.face_detector = FaceDetector()
         self.fer_classifier = _make_fer_classifier()
         self.post_process = T.Compose([
+            T.Resize((48, 48)),
             T.Grayscale(),
             T.ConvertImageDtype(torch.float32),
             T.Normalize(FaceExpressionRecognizer._DATASET_MEAN, FaceExpressionRecognizer._DATASET_STD)
@@ -51,8 +52,8 @@ class FaceExpressionRecognizer:
 
 def _make_fer_classifier() -> nn.Module:
     model = ResNet18(1, 7)
-    fer_fc = nn.Linear(256, 7)
-    model = nn.Sequential(*list(model.children())[:-1])
-    model = nn.Sequential(*model, fer_fc)
-    model.load_state_dict(torch.load('./saved_models/fer_model.pth', map_location=torch.device('cpu')))
+    # fer_fc = nn.Linear(256, 7)
+    # model = nn.Sequential(*list(model.children())[:-1])
+    # model = nn.Sequential(*model, fer_fc)
+    model.load_state_dict(torch.load('./saved_models/weighted_sampler200_fer_model.pth', map_location=torch.device('cpu')))
     return model
