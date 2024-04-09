@@ -5,8 +5,11 @@ from torchvision.transforms import v2
 
 from model_old import ResNet18
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 model = ResNet18(1, 7)
-model.load_state_dict(torch.load("./model.pth", map_location="cpu"))
+model.load_state_dict(torch.load("./model.pth", map_location=device))
+model.to(device)
 model.eval()
 
 face_cascade = cv2.CascadeClassifier("./haarcascade_frontalface_default.xml")
@@ -28,8 +31,9 @@ preprocess = v2.Compose(
 
 def get_probs(image):
     inp = preprocess(torch.tensor(image).permute(2, 0, 1).unsqueeze(0))
+    inp = inp.to(device)
     pred = model(inp).squeeze()
-    probs = torch.softmax(pred, 0)
+    probs = torch.softmax(pred, 0).cpu()
     return probs
 
 
