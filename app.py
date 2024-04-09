@@ -67,5 +67,29 @@ def predict(image):
     return image
 
 
-iface = gr.Interface(fn=predict, inputs=gr.Image(), outputs=gr.Image())
+webcam_interface = gr.Interface(
+    predict,
+    inputs=gr.Image(sources=['webcam'], streaming=True, label='Input webcam'),
+    outputs=gr.Image(label='Output video'),
+    live=True,
+    title='Webcam mode',
+    description='Created by Czarna Magia AI Student Club',
+    theme=gr.themes.Soft(),
+)
+
+img_interface = gr.Interface(
+    predict,
+    inputs=gr.Image(sources=['webcam', 'upload'], label='Input image'),
+    outputs=gr.Image(label='Output image'),
+    title='Image upload mode',
+    description='Created by Czarna Magia AI Student Club',
+    theme=gr.themes.Soft(),
+)
+
+iface = gr.TabbedInterface(
+    interface_list=[img_interface, webcam_interface],
+    tab_names=['Image upload', 'Webcam'],
+    title='Face Expression Recognizer',
+    theme=gr.themes.Soft(),
+)
 iface.launch()
