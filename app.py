@@ -79,7 +79,7 @@ webcam_interface = gr.Interface(
 
 img_interface = gr.Interface(
     predict,
-    inputs=gr.Image(sources=['webcam', 'upload'], label='Input image'),
+    inputs=gr.Image(sources=['webcam', 'upload', 'clipboard'], label='Input image'),
     outputs=gr.Image(label='Output image'),
     title='Image upload mode',
     description='Created by Czarna Magia AI Student Club',
