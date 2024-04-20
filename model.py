@@ -7,34 +7,34 @@ class ResNet18(nn.Module):
         super().__init__()
         self.initial_conv = nn.Conv2d(
             in_channels=in_channels,
-            out_channels=64,
-            kernel_size=7,
-            stride=2,
-            padding=3,
+            out_channels=32,
+            kernel_size=5,
+            stride=1,
+            padding=2,
             bias=False,
         )
-        self.bn = nn.BatchNorm2d(64)
+        self.bn = nn.BatchNorm2d(32)
         self.relu = nn.ReLU(inplace=True)
         self.max_pool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
-        self.layer1 = nn.Sequential(BasicBlock(64, 64), BasicBlock(64, 64))
+        self.layer1 = nn.Sequential(BasicBlock(32, 32), BasicBlock(32, 32))
         self.layer2 = nn.Sequential(
+            BasicBlock(32, 64, stride=2, downsample=self._downsample(32, 64)),
+            BasicBlock(64, 64),
+        )
+        self.layer3 = nn.Sequential(
             BasicBlock(64, 128, stride=2, downsample=self._downsample(64, 128)),
             BasicBlock(128, 128),
         )
-        self.layer3 = nn.Sequential(
+        self.layer4 = nn.Sequential(
             BasicBlock(128, 256, stride=2, downsample=self._downsample(128, 256)),
             BasicBlock(256, 256),
-        )
-        self.layer4 = nn.Sequential(
-            BasicBlock(256, 512, stride=2, downsample=self._downsample(256, 512)),
-            BasicBlock(512, 512),
         )
 
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
         self.drop = nn.Dropout(0.15)
         self.flatten = nn.Flatten(1)
-        self.fc = nn.Linear(512, num_classes)
+        self.fc = nn.Linear(256, num_classes)
 
     @staticmethod
     def _downsample(in_channels: int, out_channels: int) -> nn.Sequential:
@@ -43,7 +43,7 @@ class ResNet18(nn.Module):
             nn.BatchNorm2d(out_channels),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         x = self.initial_conv(x)
         x = self.bn(x)
         x = self.relu(x)
@@ -55,7 +55,7 @@ class ResNet18(nn.Module):
         x = self.layer4(x)
 
         x = self.avg_pool(x)
-        x = self.drop(x)  # because linear layers tends to overfit more
+        x = self.drop(x)
         x = self.flatten(x)
         x = self.fc(x)
         return x
