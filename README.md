@@ -7,8 +7,8 @@ The project is the result of work done by members of the Czarna Magia AI Student
 
 ## Demo
 
-The project is hosted on Hugging Face Spaces. Please, feel free to check out our
-[live demo app on Gradio](https://huggingface.co/spaces/jlynxdev/face-expression-recognizer)!
+The project is hosted on Hugging Face Spaces :hugs:. Please, feel free to check out our
+[live demo app on Gradio](https://huggingface.co/spaces/jlynxdev/face-expression-recognizer)! :rocket:
 
 ## Dataset
 
