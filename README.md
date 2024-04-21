@@ -23,7 +23,7 @@ The project's AI models have been trained on the dataset which comes from the
 - Matplotlib
 - Weights & Biases
 
-# How to run this app
+## How to run this app
 
 1. Clone the repository: First, you need to clone the repository to your local machine. You can do this with the `git clone` command:
     ```
@@ -56,7 +56,7 @@ The project's AI models have been trained on the dataset which comes from the
     After running this command, a URL should be displayed in the console. This is the URL where your application is running and can be accessed.
 4. Access the application: Paste displayed URL in the console to your browser.
 
-# Authors and acknowledgement
+## Authors and acknowledgement
 
 The project has been created by the following developers:
 - Jakub Hryniewicz ([KubaHryna](https://github.com/KubaHryna))
