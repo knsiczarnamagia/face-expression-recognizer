@@ -10,8 +10,12 @@ from typing import Callable
 from datetime import datetime as dt
 from abc import ABC, abstractmethod
 
+
 _DATASET_AVG_MEAN = 129.38489987766278
+"Average mean pixel intensity per image of the whole FER-2013 dataset."
+
 _DATASET_AVG_STD = 54.084109207654805
+"Average pixel intensity's standard deviation per image of the whole FER-2013 dataset."
 
 
 def save_to_file(location: str = './extracted_paths.txt') -> Callable:
@@ -55,23 +59,58 @@ def visualize(show_limit: int = -1) -> Callable:
 
 
 class DataFilter(ABC):
+    """An abstract class for filters.
+
+    Subclasses should implement the `extract`, `clear` and `filter` methods.
+
+    Provides a private `_load_data` method for loading image data from an image dataset directory.
+    """
     def __init__(self):
         self.paths = []
 
     @abstractmethod
     def extract(self, data_dir: str | Path, visualize_: bool, to_file: bool) -> list[str]:
+        """Extracts file paths of images selected for removal and adds them to the list of previously extracted items.
+
+        Args:
+            data_dir: An image dataset directory to be filtered.
+            visualize_: Whether extracted image paths should be plotted as images on a figure at the end of the
+                extraction process.
+            to_file: Whether extracted paths should be saved to a text file.
+
+        Returns:
+            A list of extracted file paths.
+        """
         pass
 
     @abstractmethod
     def clear(self) -> None:
+        """Clears the whole list of saved file paths extracted for removal."""
         pass
 
     @abstractmethod
     def filter(self) -> bool:
+        """Removes the files which had been extracted by the `extract()` method.
+
+        For files to be removed, the `extract()` method must be invoked first. Otherwise, the filepath list will be
+        empty and no files will be removed.
+
+        The action is irreversible.
+        """
         pass
 
     @staticmethod
     def _load_data(dir_: str) -> tuple[list[np.ndarray], list[str], list[str]]:
+        """Loads image data from an image dataset directory.
+
+        Args:
+            dir_: The dataset directory from which to load data. The directory structure must follow the standard
+                image classification format.
+
+        Returns:
+            A tuple of: a list of grayscaled images in numpy.ndarray format; a list of class names corresponding to the
+                images; a list of paths pointing to original image files.
+        """
         images = []
         class_names = []
         paths = []
@@ -88,12 +127,26 @@ class DataFilter(ABC):
 
 
 class DataFilterCompose(DataFilter):
+    """A container class for stacking multiple data filters together.
+
+    It is itself a DataFilter and delegates all the filter operations to its child subcomponents. Provides two basic
+    methods for adding and removing subcomponents: `add_component()` and `rm_component()`.
+    """
     def __init__(self, components: list[DataFilter]):
         super().__init__()
         self.components = components
 
     @staticmethod
     def build(components: list[DataFilter]) -> DataFilter:
+        """A static factory method to create instances of DataFilterCompose. It is the preferred way of initialising
+        objects of this class.
+
+        Args:
+            components: A list of DataFilter objects which will operate as child subcomponents.
+
+        Returns:
+            An new instance of DataFilterCompose.
+        """
         return DataFilterCompose(components)
 
     def extract(self, data_dir: str | Path, visualize_: bool, to_file: bool) -> list[str]:
@@ -115,15 +168,37 @@ class DataFilterCompose(DataFilter):
             component.filter()
 
     def add_component(self, component: DataFilter, position: int) -> None:
+        """Inserts a subcomponent data filter into a specified position.
+
+        Args:
+            component: A DataFilter to add as a component.
+            position: An index position at which the component should be added. Indexing starts from 0.
+        """
         self.components.insert(position, component)
 
     def rm_component(self, position: int) -> None:
+        """Removes a subcomponent at a specified position.
+
+        Args:
+            position: An index position from which the component should be removed. Indexing starts from 0.
+        """
         self.components.pop(position)
 
 
 class StatsDataFilter(DataFilter):
+    """A data filter based on statistical analysis of image data.
+
+    Removes image files whose pixel intensity mean or standard deviation values diverge from the whole dataset's
+    average values by more than the defined optimum threshold.
+    """
+
     _OPTIM_MEAN_THRESH = 107
+    """An empirically defined optimum mean pixel intensity threshold at which the filter performs best on the
+    FER-2013 dataset."""
+
     _OPTIM_STD_THRESH = 51
+    """An empirically defined optimum pixel intensity's standard deviation threshold at which the filter performs
+    best on the FER-2013 dataset."""
 
     def __init__(self, data_avg_mean: float = None, data_avg_std: float = None, console_output: bool = False):
         super().__init__()
@@ -212,8 +287,17 @@ class StatsDataFilter(DataFilter):
 
 
 class PcaDataFilter(DataFilter):
+    """A data filter based on PCA (principal component analysis).
+
+    Removes image files whose reconstruction error from the data compressed by PCA exceeds a defined optimum threshold.
+    """
+    
     _OPTIM_NUM_COMPONENTS = 4
+    """An empirically defined optimum number of PCA components at which the filter performs best on the FER-2013
+    dataset."""
+
     _OPTIM_ERROR_THRESH = 87
+    """An empirically defined optimum error threshold at which the filter performs best on the FER-2013 dataset."""
 
     def __init__(self, console_output: bool = False):
         super().__init__()
@@ -270,6 +354,11 @@ class PcaDataFilter(DataFilter):
 
 
 class DHashDuplicateFilter(DataFilter):
+    """A data filter specialised for detecting and removing duplicate images.
+
+    Filters out images whose hashed representations are identical.
+    """
+
     def __init__(self, hash_size: int = 8, console_output: bool = False):
         super().__init__()
         self.hash_size = hash_size
@@ -326,7 +415,7 @@ if __name__ == '__main__':
 
     # You may set the value of visualize_ or to_file parameters to True
     # to plot extracted images or save paths to a file.
-    stats_filter.extract(dataset_dir, visualize_=False, to_file=False)
+    compose.extract(dataset_dir, visualize_=False, to_file=False)
 
     # WARNING: uncommenting the line below will irreversibly remove dataset files
     # compose.filter()
