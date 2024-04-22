@@ -5,10 +5,10 @@ It's main goal is to detect and classify human face expressions.
 
 The project is the result of work done by members of the Czarna Magia AI Student Club.
 
-## Demo
+## :rocket: Demo :rocket:
 
 The project is hosted on Hugging Face Spaces :hugs:. Please, feel free to check out our
-[live demo app on Gradio](https://huggingface.co/spaces/jlynxdev/face-expression-recognizer)! :rocket:
+[live demo app on Gradio](https://huggingface.co/spaces/jlynxdev/face-expression-recognizer)! :sparkles:
 
 ## Dataset
 
@@ -58,7 +58,7 @@ The project's AI models have been trained on the dataset which comes from the
 
 ## Authors and acknowledgement
 
-The project has been created by the following developers:
+:clap: The project has been created by the following developers:
 - Jakub Hryniewicz ([KubaHryna](https://github.com/KubaHryna))
 - Dawid Koterwas ([Kiwinicki](https://github.com/Kiwinicki))
 - Jacek Nowak ([jlynxdev](https://github.com/jlynxdev))
